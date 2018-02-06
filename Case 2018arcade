@@ -1,0 +1,331 @@
+package org.usfirst.frc.team2261.robot;
+
+/*----------------------------------------------------------------------------*/
+
+/* Copyright (c) FIRST 2008. All Rights Reserved.                             */
+/* Open Source Software - may be modified and shared by FRC teams. The code   */
+/* must be accompanied by the FIRST BSD license file in the root directory of */
+/* the project.                                                               */
+/*----------------------------------------------------------------------------*/
+// PLEZ READ\ 
+/* CLEAN IF YOU CANNOT CONNECT TO THE ROBORIO. HOW TO CLEAN: Go to Project > Clean to clean up project; may be able to work fine after.
+ Another way to clean the roboRIO/DNS: Press Windows key > Search for Command Prompt > in the Prompt type in "ping" (roboRIO-2261-FRC.local)
+or (10.22.61.78 to see if you can get a reply from it; After that use the command "ipconfig /flushdns" to clear out the Cache; problem
+should be fixed to build the code. */
+// import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.RobotDrive;
+import edu.wpi.first.wpilibj.SampleRobot;
+//import edu.wpi.first.wpilibj.Talon;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.command.Command;
+import edu.wpi.first.wpilibj.command.Scheduler;
+
+import java.util.Date;
+
+// import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+// import edu.wpi.first.wpilibj.vision
+import edu.wpi.first.wpilibj.CameraServer;
+//import edu.wpi.first.wpilibj.Compressor;
+//import edu.wpi.first.wpilibj.DoubleSolenoid;
+//import edu.wpi.first.wpilibj.Solenoid;
+import edu.wpi.first.wpilibj.Spark;
+//Added new declaration to import box "edu.wpi.first.wpilibj.vision.USBCamera" to box.
+/**
+ * The VM is configured to automatically run this class, and to call the
+ * functions corresponding to each mode, as described in the SimpleRobot
+ * documentation. If you change the name of this class or the package after
+ * creating this project, you must also update the manifest file in the resource
+ * directory.
+ */
+public class Robot extends SampleRobot {
+
+	// private static final double DEADZONE = -0.3;
+	static double UPDATE_DELAY = 0.0075; // How often to refresh
+	static double MOTOR_EXPIRATION = UPDATE_DELAY * 4;
+	//static double CLAW_UP = 3.0;
+	//static double CLAW_DOWN = 0.5;
+	Command autonomousCommand;
+	
+
+	// Dampening constants
+	// Not used until we have ability to do so.        NOT USED INDEFINITLY - REASONS
+	/* private static final double kPWM = 0.005; // added .005 to 0; hopefully able
+												// to have increased driving
+												// ability.
+	private static final double kPWM_MAX = 0.5; // dropped 1 down to 0.1; made
+												// the driving speed have less
+												// turning radius.
+	private static final double kdPWM_MAX = 0.5; */         
+
+	// IMPORTANT!!!!!!
+	// Set to true for driving fork_lift from accessory y-axis (when not at
+	// limit or being driven by accessory buttons)
+	//static boolean MAP_YAXIS_TO_FORKLIFT = true;
+	//static boolean MAP_ZAXIS_TO_ClAW = true;
+	//static boolean DIP_SWITCH = true;
+
+	// Values for fork_lift motor (determined by testing)
+	//static double FORKLIFT_NOMINAL_UP = 0.2;
+	//static double FORKLIFT_ALOT_UP = 0.2;
+	//static double FORKLIFT_FULL_LIFT = 0.75;
+	//static double FORKLIFT_NOMINAL_DOWN = -0.5;
+	//static double CLAW_OPEN = 0.5;
+	//static double CLAW_CLOSE = -0.5;
+	//static double KICK_DOWN = -0.9;// ARM Added much more added effect to
+									// Kicker; originally -.01 and added to
+									// -.09.
+//	static double KICK_UP = 1.0;// DISARM Added much more added effect to
+								// Kicker; originally .01 and added to .09.
+	//static double WINCH_UP = 1;
+	//static double WINCH_DOWN = -1;
+	
+	// Create a new RobotDrive, composed of the following motor controllers
+	//Talons (#1 is back right Talon, #3 is back left Talon) are used for driving.
+	Spark right = new Spark(1); // Undo'd the Talon; placed Spark as ; front right is messed v Spark is (2) as of now.
+	
+	
+	Spark left = new Spark(2); // Undo'd the Talon. Changed from 3 to 4 BACK to 3
+	
+//	Spark backRight = new Spark(1); //used for Winch<-Old code in past Seasons; added new Spark as for motor for 
+
+	// Spark winchMotor = new Spark(2); 
+//	Spark backLeft = new Spark(4); //completely new Spark addition; added as Mecanum for the back left motor of the Jags
+	//^front right is plugged into 2 and needed to crimp in new ones^
+	Spark conveyor = new Spark (4);
+			
+	 
+	
+	//DoubleSolenoid BillygatesSolenoid = new DoubleSolenoid(0,1);
+	//Solenoid GodsSolenoid = new Solenoid(3);
+	//Talon frontLeft = new Talon(4);  // currently unused
+	
+	RobotDrive robotDrive = new RobotDrive(left, right); //frontLeft, frontRight);   - Changed backLeft and backRight to Left and Right
+	
+	//Compressor compressor = new Compressor();
+
+/*	Spark clawController = new Spark(5);
+
+	Spark upAndDownController = new Spark(6);
+
+	Spark kickerController = new Spark(7); // Sparks number 7 and number 8 are
+											// shared.
+
+*/ //Create new Joy_stick on ports 1 and 2
+	Joystick driverJoystick = new Joystick(0);
+	Joystick accessoryJoystick = new Joystick(1);
+	static double prevPWM, dPWM = 0;
+
+	// Kicker_Claw Sensor
+/*	DigitalInput forkliftLowerSwitch = new DigitalInput(2);
+	DigitalInput forkliftUpperSwitch = new DigitalInput(3);
+	DigitalInput kickerSwitch = new DigitalInput(0);
+	DigitalInput forkliftSwitch = new DigitalInput(3);
+*/
+	boolean robotInitted = false;
+//	boolean useForklift = false;
+
+	protected void robotInit() {
+		//robotDrive.setInvertedMotor(RobotDrive.MotorType.kFrontRight, true);
+		//robotDrive.setInvertedMotor(RobotDrive.MotorType.kRearRight, true);
+//	       CameraServer.getInstance().startAutomaticCapture();  // cam0
+	//        CameraServer.getInstance().startAutomaticCapture();  // cam2 - shows up in driver station options as Camera 1
+		// (Re-)Enable motor safety with .25s expiration
+		// "Motor safety is a mechanism built into the RobotDrive object that
+		// will turn off the motors if the program doesn't continuously update
+		// the motor speed." (default "expiration" is 100ms)
+		robotDrive.setExpiration(Robot.MOTOR_EXPIRATION);
+		robotDrive.setSafetyEnabled(true);
+		//compressor.start();
+		
+		//BillygatesSolenoid.set(DoubleSolenoid.Value.kReverse);
+		//	BillygatesSolenoid.set(DoubleSolenoid.Value.kForward);
+		
+		
+		// Ensure all motors are stopped (I don't believe we should have to do this)
+		robotDrive.drive(0, 0);
+// ToDo Add Winchdrive zero out here
+		
+		robotInitted = true;
+	} //End RobotInit
+
+	public void autonomous() 
+	{
+		
+		robotDrive.setExpiration(MOTOR_EXPIRATION);
+		if (!robotInitted) 
+		{
+			System.out.println("Robot not initted? Initting...");
+			robotInit();
+		}
+		
+		
+	//	Date startTime = new Date();
+// Chris was here
+/*		driveAutonForNSeconds(1.2, -0.6075);
+		BillygatesSolenoid.set(DoubleSolenoid.Value.kForward);
+		driveAutonForNSeconds(5.0, 0.0);
+		robotDrive.drive(0, 0);
+*/
+			// Driver forward at half speed for 3 seconds
+			 
+			// Timer.delay(3);
+			// robotDrive.drive(0, 0);
+			// Timer.delay(100);
+		}
+//1.1s -0.47
+	private void driveAutonForNSeconds(double nSeconds, double magnitude) {
+		Timer timer = new Timer();
+		timer.reset();
+		timer.start();
+		while (isAutonomous() && isEnabled() && timer.get() < nSeconds) 
+		{
+			robotDrive.drive(magnitude, 0);
+			Timer.delay(Robot.UPDATE_DELAY);
+		}
+	}
+		
+	/*New 2018 PseudoCode
+	Option 1:
+	Move 12ft forwards to pass the line
+	
+	Option 2:
+	Move 12ft forwards to pass the line
+	Rotate 90degrees to the right
+	Move forward like 5ft just to 'crash' into the ScoringBox and get in place
+	Drop box into ScoringBox
+	
+	Option 3:
+	Drive forward enough to rotate
+	Rotate 45 degrees to the left
+	Move forward until robot is past the tape line
+	Rotate 135 degrees to the right
+	Drive forward enough to 'crash' into ScoringBox and get in place
+	Deliver box into ScoringBox
+	
+	Option 4:
+	Drive forward enough rotate
+	Rotate 45 degrees to the right
+	Move forward until robot is past the tape line
+	Rotate 135 degrees to the left
+	Drive forward enough to 'crash' into the ScoringBox and get into place
+	Deliver box into ScoringBox
+	
+	Option 5:
+	Move 12ft forwards to pass the line
+	
+	Option 6:
+	Move 12 ft forwards to pass the line
+	Rotate 90 degrees to the left
+	Move forward enough to 'crash' into the ScoringBox to get in place
+	Deliver box into ScoringBox
+	
+	Option 7:Party
+	Rotate to the right forever!
+	
+	
+	
+	
+	
+	/**
+	 * This function is called once each time the robot enters operator control.
+	 */
+	public void operatorControl() {
+		robotDrive.setExpiration(MOTOR_EXPIRATION);
+
+		
+		if (!robotInitted) {
+			System.out.println("Robot not initted? Initting...");
+			robotInit();
+		}
+
+		// While still under operator control and enabled, "arcade drive" robot,
+		while (isOperatorControl() && isEnabled()) {
+
+		//	robotDrive.arcadeDrive(driverJoystick.getY() * 1, driverJoystick.getZ() * 1); // Rotate Clockwise and Counter-Clockwise
+			//Replace Joystick format with the Mecanum drive.
+			if(driverJoystick.getZ() < 0) {
+				robotDrive.arcadeDrive(driverJoystick.getX(),driverJoystick.getY());
+			} else {
+				robotDrive.arcadeDrive(driverJoystick.getX(),driverJoystick.getY());
+			}
+			conveyor.set(0.25*accessoryJoystick.getZ());
+			// Print debug info
+			putSmartDashboardValues();
+
+			Timer.delay(Robot.UPDATE_DELAY); // Wait the specified second before
+												// updating again
+		}
+
+		// Stop the robot
+		robotDrive.drive(0, 0);
+	}
+		
+	public void autonomousPeriodic() {
+		Scheduler.getInstance().run();
+	}
+	
+	public double getRotation(Joystick joystick){
+			if(joystick.getRawButton(4)){
+				return 0.75;
+			}
+			if(joystick.getRawButton(5)){
+				return -0.75;
+			}
+			return 0.0;
+	}
+
+@Override
+	protected void disabled() {
+		robotDrive.drive(0, 0);
+		robotInitted = false;
+		//  BillygatesSolenoid.set(DoubleSolenoid.Value.kOff);
+		//  BillygatesSolenoid.set(DoubleSolenoid.Value.kReverse);
+		Timer.delay(3);
+
+	}
+
+	private void putSmartDashboardValues() {
+
+		/*
+		 * SmartDashboard.putBoolean("isKickerLoaded()", isKickerLoaded());
+		 * SmartDashboard.putBoolean("isForkliftAtUpperLimit()",
+		 * isForkliftAtUpperLimit());
+		 * SmartDashboard.putNumber("upAndDownController.getRaw()",
+		 * upAndDownController.getRaw());
+		 * 
+		 * SmartDashboard.putNumber("driverJoystick.getX()",
+		 * driverJoystick.getX());
+		 * SmartDashboard.putNumber("scaleJoystickInput(driverJoystick.getX())",
+		 * scaleJoystickInput(driverJoystick.getX()));
+		 * SmartDashboard.putNumber("driverJoystick.getY()",driverJoystick.getY(
+		 * ));
+		 * SmartDashboard.putNumber("scaleJoystickInput(driverJoystick.getY())",
+		 * scaleJoystickInput(driverJoystick.getY()));
+		 * SmartDashboard.putNumber("driverJoystick.getZ()",driverJoystick.getZ(
+		 * ));
+		 * SmartDashboard.putNumber("scaleJoystickInput(driverJoystick.getZ())",
+		 * scaleJoystickInput(driverJoystick.getZ()));
+		 * SmartDashboard.putNumber("driverJoystick.getThrottle()",
+		 * driverJoystick.getThrottle());
+		 * SmartDashboard.putNumber("accessoryJoystick.getX())",
+		 * accessoryJoystick.getX());
+		 * SmartDashboard.putNumber("accessoryJoystick.getY()",accessoryJoystick
+		 * .getY()); SmartDashboard.putNumber(
+		 * "scaleJoystickInput(accessoryJoystick.getY())",
+		 * scaleJoystickInput(accessoryJoystick.getX()));
+		 * SmartDashboard.putNumber("accessoryJoystick.getZ()",accessoryJoystick
+		 * .getZ()); SmartDashboard.putNumber("accessoryJoystick.getThrottle()",
+		 * accessoryJoystick.getThrottle());
+		 * SmartDashboard.putNumber("accessoryJoystick.getTwist()",
+		 * accessoryJoystick.getTwist());
+		 * SmartDashboard.putBoolean("accessoryJoystick.getRawButton(2)",
+		 * accessoryJoystick.getRawButton(2));
+		 * SmartDashboard.putBoolean("accessoryJoystick.getRawButton(3)",
+		 * accessoryJoystick.getRawButton(3));
+		 */
+		//SmartDashboard.putBoolean("isKickerLoaded()", isKickerLoaded());
+		
+	}
+
+}
